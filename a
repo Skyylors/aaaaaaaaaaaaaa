@@ -5,66 +5,84 @@ from stem import Signal
 from stem.control import Controller
 
 # ===== CONFIGURATION =====
-URL_CIBLE = "https://bit.ly/3M3jDIA" 
+URL_CIBLE = "https://bit.ly/3M3jDIA"
 OBJECTIF = 100
+PORT_CONTROLE_TOR = 9051
+PORT_PROXY_TOR = 9050
 
 def changer_ip():
+    """Demande à Tor de changer de circuit pour obtenir une nouvelle IP."""
     try:
-        with Controller.from_port(port=9051) as controller:
-            controller.authenticate()
+        with Controller.from_port(port=PORT_CONTROLE_TOR) as controller:
+            controller.authenticate()  # CookieAuthentication doit être à 0 dans torrc
             controller.signal(Signal.NEWNYM)
+            # On laisse 5 secondes à Tor pour établir le nouveau circuit
+            time.sleep(5)
             return True
     except Exception as e:
-        print(f"❌ Erreur Tor : {e}")
+        print(f"❌ Erreur de contrôle Tor : {e}")
+        print("💡 Vérifie que 'sudo systemctl status tor' est actif.")
         return False
 
-def obtenir_ip_actuelle(proxies):
-    """Petite fonction pour demander à internet quelle est notre IP"""
-    try:
-        # On demande à un site de test notre IP
-        r = requests.get("http://httpbin.org/ip", proxies=proxies, timeout=10)
-        return r.json()['origin']
-    except:
-        return "Inconnue"
-
-def bot_clic():
+def envoyer_clic(session, n):
+    """Envoie la requête via le proxy Tor avec des headers anti-403."""
     proxies = {
-        'http': 'socks5h://127.0.0.1:9050',
-        'https': 'socks5h://127.0.0.1:9050'
+        'http':  f'socks5h://127.0.0.1:{PORT_PROXY_TOR}',
+        'https': f'socks5h://127.0.0.1:{PORT_PROXY_TOR}'
     }
     
-    agents = [
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    # Liste de User-Agents pour varier l'identité
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1'
     ]
 
-    print(f"🚀 Lancement du bot avec VÉRIFICATION D'IP...")
-    
-    for i in range(OBJECTIF):
-        print("-" * 50)
+    headers = {
+        'User-Agent': random.choice(user_agents),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://www.google.com/',  # Indispensable pour éviter le blocage direct
+        'DNT': '1'
+    }
+
+    try:
+        # allow_redirects=True est vital pour suivre le lien Bitly vers la cible
+        r = session.get(URL_CIBLE, proxies=proxies, headers=headers, timeout=20, allow_redirects=True)
         
-        # 1. On change d'identité
+        if r.status_code == 200:
+            print(f"✅ [{n}/{OBJECTIF}] Succès ! Point comptabilisé.")
+            return True
+        elif r.status_code == 403:
+            print(f"🚫 [{n}/{OBJECTIF}] Erreur 403 : IP Tor bloquée. Nouvelle tentative...")
+            return False
+        else:
+            print(f"⚠️ [{n}/{OBJECTIF}] Code reçu : {r.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ [{n}/{OBJECTIF}] Erreur réseau (Nœud lent)")
+        return False
+
+# ===== EXECUTION =====
+print("="*50)
+print("🔥 BOT CLASSEMENT KALI LINUX - EDITION TOR")
+print("="*50)
+
+success_count = 0
+with requests.Session() as session:
+    while success_count < OBJECTIF:
         if changer_ip():
-            print("🔄 Changement d'identité...")
-            time.sleep(6) # On laisse le temps au nouveau circuit de se faire
-        
-        # 2. PREUVE : On vérifie l'IP avant de cliquer
-        ip_tor = obtenir_ip_actuelle(proxies)
-        print(f"🕵️  Nouvelle IP utilisée : \033[92m{ip_tor}\033[0m") # S'affiche en vert
-        
-        # 3. On clique
-        try:
-            headers = {'User-Agent': random.choice(agents)}
-            r = requests.get(URL_CIBLE, proxies=proxies, headers=headers, timeout=15)
+            # On tente le clic
+            if envoyer_clic(session, success_count + 1):
+                success_count += 1
             
-            if r.status_code == 200:
-                print(f"✅ [Clic {i+1}/{OBJECTIF}] VALIDÉ par le serveur")
-            else:
-                print(f"⚠️ Code reçu : {r.status_code}")
-        except Exception as e:
-            print(f"❌ Erreur : {e}")
+            # Pause aléatoire pour la discrétion (entre 5 et 12 secondes)
+            pause = random.uniform(5, 12)
+            print(f"⏳ Attente de {pause:.1f}s...")
+            time.sleep(pause)
 
-        time.sleep(2)
-
-if __name__ == "__main__":
-    bot_clic()
+print(f"\n🏁 Terminé ! {success_count} clics effectués.")
