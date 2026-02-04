@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""
-Script de rotation IP avec Tor - Optimisé pour Kali Linux
-"""
-
 import requests
 import time
 from stem import Signal
 from stem.control import Controller
 from datetime import datetime
 
-# ===== CONFIGURATION =====
-URL = "METTEZ_LE_LIEN_DE_VOTRE_PROF_ICI"  # ⚠️ MODIFIEZ CETTE LIGNE
-MAX_CLICS = 100
-PAUSE_ENTRE_CLICS = 2
+# ===== À MODIFIER ICI =====
+URL = "https://VOTRE_LIEN_ICI"  # ⚠️ METTEZ LE VRAI LIEN
+MAX_CLICS = 100  # Nombre de clics souhaités
+PAUSE = 2  # Secondes entre chaque clic
 
 # Configuration Tor
 TOR_PROXY = {
@@ -20,125 +16,129 @@ TOR_PROXY = {
     'https': 'socks5://127.0.0.1:9050'
 }
 
-def get_current_ip():
-    """Récupère l'IP actuelle via Tor"""
+def get_ip():
+    """Récupère l'IP actuelle"""
     try:
-        response = requests.get('http://httpbin.org/ip', proxies=TOR_PROXY, timeout=10)
-        return response.json()['origin']
+        r = requests.get('http://httpbin.org/ip', proxies=TOR_PROXY, timeout=10)
+        return r.json()['origin']
     except:
         return "Erreur"
 
-def renew_tor_ip():
-    """Change l'identité Tor pour obtenir une nouvelle IP"""
+def renew_ip():
+    """Change l'IP Tor"""
     try:
         with Controller.from_port(port=9051) as controller:
             controller.authenticate()
             controller.signal(Signal.NEWNYM)
             time.sleep(3)
         return True
-    except Exception as e:
-        print(f"⚠️ Erreur renouvellement: {e}")
+    except:
         return False
 
 def faire_clic():
-    """Effectue un clic sur l'URL cible"""
+    """Fait un clic sur l'URL"""
     try:
-        response = requests.get(URL, proxies=TOR_PROXY, timeout=15)
-        return response.status_code == 200
+        r = requests.get(URL, proxies=TOR_PROXY, timeout=15)
+        return r.status_code == 200
     except:
         return False
 
 # ===== PROGRAMME PRINCIPAL =====
-print("🧅 SCRIPT TOR - KALI LINUX")
-print("="*60)
+print("=" * 60)
+print("🧅 SCRIPT DE CLICS AUTOMATIQUES AVEC TOR")
+print("=" * 60)
 
-if URL == "METTEZ_LE_LIEN_DE_VOTRE_PROF_ICI":
-    print("❌ ERREUR: Modifiez l'URL dans le script!")
+# Vérification de l'URL
+if "VOTRE_LIEN_ICI" in URL:
+    print("\n❌ ERREUR: Vous devez modifier l'URL dans le script!")
+    print("   Ouvrez le script et changez la ligne URL")
     exit(1)
 
 # Vérification Tor
-print("🔍 Vérification Tor...", end=" ")
-ip = get_current_ip()
+print("\n🔍 Vérification de Tor...", end=" ")
+ip = get_ip()
 if ip == "Erreur":
     print("❌")
     print("\n⚠️ Tor ne fonctionne pas!")
-    print("Vérifiez : sudo systemctl status tor")
+    print("Tapez: sudo systemctl start tor")
     exit(1)
 else:
-    print(f"✅ IP: {ip}")
+    print(f"✅")
+    print(f"   Votre IP Tor: {ip}")
 
-# Test renouvellement
-print("🔄 Test rotation IP...", end=" ")
-if renew_tor_ip():
-    new_ip = get_current_ip()
-    if new_ip != ip:
-        print(f"✅ Nouvelle IP: {new_ip}")
-    else:
-        print("⚠️ IP inchangée (normal parfois)")
+# Test rotation
+print("🔄 Test de rotation d'IP...", end=" ")
+if renew_ip():
+    nouvelle_ip = get_ip()
+    print(f"✅")
+    print(f"   Nouvelle IP: {nouvelle_ip}")
 else:
-    print("❌")
+    print("⚠️ (pas grave, on continue)")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print(f"🎯 Objectif: {MAX_CLICS} clics")
 print(f"🌐 URL: {URL}")
-print("="*60)
+print(f"⏱️  Pause: {PAUSE} secondes entre chaque clic")
+print("=" * 60)
 
-input("\n▶️  Appuyez sur Entrée pour démarrer...")
+input("\n▶️  Appuyez sur ENTRÉE pour démarrer...")
 
-# Boucle principale
-compteur_succes = 0
-compteur_echecs = 0
+# Compteurs
+succes = 0
+echecs = 0
 ips_utilisees = set()
 debut = datetime.now()
 
-print("\n🚀 Démarrage...\n")
+print("\n🚀 Démarrage des clics...\n")
 
-for i in range(1, MAX_CLICS * 2):
-    if compteur_succes >= MAX_CLICS:
+# Boucle principale
+for i in range(1, MAX_CLICS * 3):  # Maximum 3x plus de tentatives
+    if succes >= MAX_CLICS:
+        print(f"\n✅ Objectif atteint: {MAX_CLICS} clics!")
         break
     
-    ip_actuelle = get_current_ip()
+    # Obtenir l'IP actuelle
+    ip_actuelle = get_ip()
     ips_utilisees.add(ip_actuelle)
     
-    print(f"[{compteur_succes}/{MAX_CLICS}] 🔄 Clic #{i} (IP: {ip_actuelle})...", end=" ", flush=True)
+    # Afficher le clic
+    print(f"[{succes}/{MAX_CLICS}] Clic #{i} (IP: {ip_actuelle[:15]})...", end=" ")
     
+    # Faire le clic
     if faire_clic():
-        compteur_succes += 1
-        print(f"✅ OK (Total: {compteur_succes})")
+        succes += 1
+        print(f"✅ Total: {succes}")
     else:
-        compteur_echecs += 1
-        print("❌ ÉCHEC")
+        echecs += 1
+        print("❌ Échec")
     
-    if compteur_succes >= MAX_CLICS:
-        break
-    
-    print(f"   🔄 Rotation IP...", end=" ", flush=True)
-    if renew_tor_ip():
-        print("✅")
-    else:
-        print("⚠️")
-    
-    time.sleep(PAUSE_ENTRE_CLICS)
+    # Si objectif pas atteint, changer d'IP
+    if succes < MAX_CLICS:
+        renew_ip()
+        time.sleep(PAUSE)
 
-# Résumé
-duree = (datetime.now() - debut).total_seconds()
+# Calcul de la durée
+duree = int((datetime.now() - debut).total_seconds())
 
-print("\n" + "="*60)
-print("📊 RÉSULTATS")
-print("="*60)
-print(f"✅ Clics réussis : {compteur_succes}")
-print(f"❌ Échecs        : {compteur_echecs}")
-print(f"🌐 IPs uniques   : {len(ips_utilisees)}")
-print(f"⏱️  Durée         : {int(duree//60)}m {int(duree%60)}s")
-print("="*60)
+# Résultats finaux
+print("\n" + "=" * 60)
+print("📊 RÉSULTATS FINAUX")
+print("=" * 60)
+print(f"✅ Clics réussis     : {succes}")
+print(f"❌ Échecs            : {echecs}")
+print(f"🌐 IPs uniques       : {len(ips_utilisees)}")
+print(f"⏱️  Durée totale      : {duree // 60}m {duree % 60}s")
+print("=" * 60)
 
-if compteur_succes >= MAX_CLICS:
-    print("\n🎉 MISSION ACCOMPLIE! 🎉")
+if succes >= MAX_CLICS:
+    print("\n🎉 MISSION ACCOMPLIE ! 🎉")
 else:
-    print(f"\n⚠️ Seulement {compteur_succes}/{MAX_CLICS} clics")
+    print(f"\n⚠️ Seulement {succes}/{MAX_CLICS} clics réussis")
 
-print(f"\n📋 {len(ips_utilisees)} IPs utilisées:")
+print(f"\n📋 Liste des IPs utilisées ({len(ips_utilisees)}):")
 for idx, ip in enumerate(sorted(ips_utilisees)[:10], 1):
     print(f"   {idx}. {ip}")
 if len(ips_utilisees) > 10:
-    print(f"   ... et {len(ips_utilisees)-10} autres")
+    print(f"   ... et {len(ips_utilisees) - 10} autres")
+
+print("\n" + "=" * 60)
