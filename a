@@ -6,7 +6,7 @@ from stem.control import Controller
 from datetime import datetime
 
 # ===== À MODIFIER ICI =====
-URL = "https://VOTRE_LIEN_ICI"  # ⚠️ METTEZ LE VRAI LIEN
+URL = "https://bit.ly/3M3jDIA"  # ⚠️ METTEZ LE VRAI LIEN
 MAX_CLICS = 100  # Nombre de clics souhaités
 PAUSE = 2  # Secondes entre chaque clic
 
