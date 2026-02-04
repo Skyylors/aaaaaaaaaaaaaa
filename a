@@ -4,8 +4,8 @@ import random
 from stem import Signal
 from stem.control import Controller
 
-# Configuration
-URL_CIBLE = "https://bit.ly/3M3jDIA"
+# ===== CONFIGURATION =====
+URL_CIBLE = "https://bit.ly/3M3jDIA" 
 OBJECTIF = 100
 
 def changer_ip():
@@ -13,36 +13,58 @@ def changer_ip():
         with Controller.from_port(port=9051) as controller:
             controller.authenticate()
             controller.signal(Signal.NEWNYM)
-            time.sleep(5) # Temps pour que le circuit Tor change
             return True
     except Exception as e:
-        print(f"❌ Erreur Tor (Service lancé ?): {e}")
+        print(f"❌ Erreur Tor : {e}")
         return False
 
-def clic_via_tor(session, n):
-    # socks5h permet de faire passer aussi les requêtes DNS par Tor
+def obtenir_ip_actuelle(proxies):
+    """Petite fonction pour demander à internet quelle est notre IP"""
+    try:
+        # On demande à un site de test notre IP
+        r = requests.get("http://httpbin.org/ip", proxies=proxies, timeout=10)
+        return r.json()['origin']
+    except:
+        return "Inconnue"
+
+def bot_clic():
     proxies = {
         'http': 'socks5h://127.0.0.1:9050',
         'https': 'socks5h://127.0.0.1:9050'
     }
-    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0'}
     
-    try:
-        r = session.get(URL_CIBLE, proxies=proxies, headers=headers, timeout=15)
-        if r.status_code == 200:
-            print(f"✅ [{n}/{OBJECTIF}] Clic réussi !")
-            return True
-    except:
-        print(f"❌ [{n}/{OBJECTIF}] Échec (Nœud Tor lent)")
-    return False
+    agents = [
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    ]
 
-# Execution
-print("🔥 Bot de classement lancé sur Kali...")
-success = 0
-with requests.Session() as s:
-    while success < OBJECTIF:
+    print(f"🚀 Lancement du bot avec VÉRIFICATION D'IP...")
+    
+    for i in range(OBJECTIF):
+        print("-" * 50)
+        
+        # 1. On change d'identité
         if changer_ip():
-            if clic_via_tor(s, success + 1):
-                success += 1
-            # Pause pour être discret (important !)
-            time.sleep(random.uniform(5, 10))
+            print("🔄 Changement d'identité...")
+            time.sleep(6) # On laisse le temps au nouveau circuit de se faire
+        
+        # 2. PREUVE : On vérifie l'IP avant de cliquer
+        ip_tor = obtenir_ip_actuelle(proxies)
+        print(f"🕵️  Nouvelle IP utilisée : \033[92m{ip_tor}\033[0m") # S'affiche en vert
+        
+        # 3. On clique
+        try:
+            headers = {'User-Agent': random.choice(agents)}
+            r = requests.get(URL_CIBLE, proxies=proxies, headers=headers, timeout=15)
+            
+            if r.status_code == 200:
+                print(f"✅ [Clic {i+1}/{OBJECTIF}] VALIDÉ par le serveur")
+            else:
+                print(f"⚠️ Code reçu : {r.status_code}")
+        except Exception as e:
+            print(f"❌ Erreur : {e}")
+
+        time.sleep(2)
+
+if __name__ == "__main__":
+    bot_clic()
