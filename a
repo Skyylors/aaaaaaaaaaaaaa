@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""
+Script de rotation IP avec Tor - Optimisé pour Kali Linux
+"""
+
+import requests
+import time
+from stem import Signal
+from stem.control import Controller
+from datetime import datetime
+
+# ===== CONFIGURATION =====
+URL = "METTEZ_LE_LIEN_DE_VOTRE_PROF_ICI"  # ⚠️ MODIFIEZ CETTE LIGNE
+MAX_CLICS = 100
+PAUSE_ENTRE_CLICS = 2
+
+# Configuration Tor
+TOR_PROXY = {
+    'http': 'socks5://127.0.0.1:9050',
+    'https': 'socks5://127.0.0.1:9050'
+}
+
+def get_current_ip():
+    """Récupère l'IP actuelle via Tor"""
+    try:
+        response = requests.get('http://httpbin.org/ip', proxies=TOR_PROXY, timeout=10)
+        return response.json()['origin']
+    except:
+        return "Erreur"
+
+def renew_tor_ip():
+    """Change l'identité Tor pour obtenir une nouvelle IP"""
+    try:
+        with Controller.from_port(port=9051) as controller:
+            controller.authenticate()
+            controller.signal(Signal.NEWNYM)
+            time.sleep(3)
+        return True
+    except Exception as e:
+        print(f"⚠️ Erreur renouvellement: {e}")
+        return False
+
+def faire_clic():
+    """Effectue un clic sur l'URL cible"""
+    try:
+        response = requests.get(URL, proxies=TOR_PROXY, timeout=15)
+        return response.status_code == 200
+    except:
+        return False
+
+# ===== PROGRAMME PRINCIPAL =====
+print("🧅 SCRIPT TOR - KALI LINUX")
+print("="*60)
+
+if URL == "METTEZ_LE_LIEN_DE_VOTRE_PROF_ICI":
+    print("❌ ERREUR: Modifiez l'URL dans le script!")
+    exit(1)
+
+# Vérification Tor
+print("🔍 Vérification Tor...", end=" ")
+ip = get_current_ip()
+if ip == "Erreur":
+    print("❌")
+    print("\n⚠️ Tor ne fonctionne pas!")
+    print("Vérifiez : sudo systemctl status tor")
+    exit(1)
+else:
+    print(f"✅ IP: {ip}")
+
+# Test renouvellement
+print("🔄 Test rotation IP...", end=" ")
+if renew_tor_ip():
+    new_ip = get_current_ip()
+    if new_ip != ip:
+        print(f"✅ Nouvelle IP: {new_ip}")
+    else:
+        print("⚠️ IP inchangée (normal parfois)")
+else:
+    print("❌")
+
+print("\n" + "="*60)
+print(f"🎯 Objectif: {MAX_CLICS} clics")
+print(f"🌐 URL: {URL}")
+print("="*60)
+
+input("\n▶️  Appuyez sur Entrée pour démarrer...")
+
+# Boucle principale
+compteur_succes = 0
+compteur_echecs = 0
+ips_utilisees = set()
+debut = datetime.now()
+
+print("\n🚀 Démarrage...\n")
+
+for i in range(1, MAX_CLICS * 2):
+    if compteur_succes >= MAX_CLICS:
+        break
+    
+    ip_actuelle = get_current_ip()
+    ips_utilisees.add(ip_actuelle)
+    
+    print(f"[{compteur_succes}/{MAX_CLICS}] 🔄 Clic #{i} (IP: {ip_actuelle})...", end=" ", flush=True)
+    
+    if faire_clic():
+        compteur_succes += 1
+        print(f"✅ OK (Total: {compteur_succes})")
+    else:
+        compteur_echecs += 1
+        print("❌ ÉCHEC")
+    
+    if compteur_succes >= MAX_CLICS:
+        break
+    
+    print(f"   🔄 Rotation IP...", end=" ", flush=True)
+    if renew_tor_ip():
+        print("✅")
+    else:
+        print("⚠️")
+    
+    time.sleep(PAUSE_ENTRE_CLICS)
+
+# Résumé
+duree = (datetime.now() - debut).total_seconds()
+
+print("\n" + "="*60)
+print("📊 RÉSULTATS")
+print("="*60)
+print(f"✅ Clics réussis : {compteur_succes}")
+print(f"❌ Échecs        : {compteur_echecs}")
+print(f"🌐 IPs uniques   : {len(ips_utilisees)}")
+print(f"⏱️  Durée         : {int(duree//60)}m {int(duree%60)}s")
+print("="*60)
+
+if compteur_succes >= MAX_CLICS:
+    print("\n🎉 MISSION ACCOMPLIE! 🎉")
+else:
+    print(f"\n⚠️ Seulement {compteur_succes}/{MAX_CLICS} clics")
+
+print(f"\n📋 {len(ips_utilisees)} IPs utilisées:")
+for idx, ip in enumerate(sorted(ips_utilisees)[:10], 1):
+    print(f"   {idx}. {ip}")
+if len(ips_utilisees) > 10:
+    print(f"   ... et {len(ips_utilisees)-10} autres")
