@@ -1,144 +1,48 @@
-#!/usr/bin/env python3
 import requests
 import time
+import random
 from stem import Signal
 from stem.control import Controller
-from datetime import datetime
 
-# ===== À MODIFIER ICI =====
-URL = "https://bit.ly/3M3jDIA"  # ⚠️ METTEZ LE VRAI LIEN
-MAX_CLICS = 100  # Nombre de clics souhaités
-PAUSE = 2  # Secondes entre chaque clic
+# Configuration
+URL_CIBLE = "https://bit.ly/3M3jDIA"
+OBJECTIF = 100
 
-# Configuration Tor
-TOR_PROXY = {
-    'http': 'socks5://127.0.0.1:9050',
-    'https': 'socks5://127.0.0.1:9050'
-}
-
-def get_ip():
-    """Récupère l'IP actuelle"""
-    try:
-        r = requests.get('http://httpbin.org/ip', proxies=TOR_PROXY, timeout=10)
-        return r.json()['origin']
-    except:
-        return "Erreur"
-
-def renew_ip():
-    """Change l'IP Tor"""
+def changer_ip():
     try:
         with Controller.from_port(port=9051) as controller:
             controller.authenticate()
             controller.signal(Signal.NEWNYM)
-            time.sleep(3)
-        return True
-    except:
+            time.sleep(5) # Temps pour que le circuit Tor change
+            return True
+    except Exception as e:
+        print(f"❌ Erreur Tor (Service lancé ?): {e}")
         return False
 
-def faire_clic():
-    """Fait un clic sur l'URL"""
+def clic_via_tor(session, n):
+    # socks5h permet de faire passer aussi les requêtes DNS par Tor
+    proxies = {
+        'http': 'socks5h://127.0.0.1:9050',
+        'https': 'socks5h://127.0.0.1:9050'
+    }
+    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0'}
+    
     try:
-        r = requests.get(URL, proxies=TOR_PROXY, timeout=15)
-        return r.status_code == 200
+        r = session.get(URL_CIBLE, proxies=proxies, headers=headers, timeout=15)
+        if r.status_code == 200:
+            print(f"✅ [{n}/{OBJECTIF}] Clic réussi !")
+            return True
     except:
-        return False
+        print(f"❌ [{n}/{OBJECTIF}] Échec (Nœud Tor lent)")
+    return False
 
-# ===== PROGRAMME PRINCIPAL =====
-print("=" * 60)
-print("🧅 SCRIPT DE CLICS AUTOMATIQUES AVEC TOR")
-print("=" * 60)
-
-# Vérification de l'URL
-if "VOTRE_LIEN_ICI" in URL:
-    print("\n❌ ERREUR: Vous devez modifier l'URL dans le script!")
-    print("   Ouvrez le script et changez la ligne URL")
-    exit(1)
-
-# Vérification Tor
-print("\n🔍 Vérification de Tor...", end=" ")
-ip = get_ip()
-if ip == "Erreur":
-    print("❌")
-    print("\n⚠️ Tor ne fonctionne pas!")
-    print("Tapez: sudo systemctl start tor")
-    exit(1)
-else:
-    print(f"✅")
-    print(f"   Votre IP Tor: {ip}")
-
-# Test rotation
-print("🔄 Test de rotation d'IP...", end=" ")
-if renew_ip():
-    nouvelle_ip = get_ip()
-    print(f"✅")
-    print(f"   Nouvelle IP: {nouvelle_ip}")
-else:
-    print("⚠️ (pas grave, on continue)")
-
-print("\n" + "=" * 60)
-print(f"🎯 Objectif: {MAX_CLICS} clics")
-print(f"🌐 URL: {URL}")
-print(f"⏱️  Pause: {PAUSE} secondes entre chaque clic")
-print("=" * 60)
-
-input("\n▶️  Appuyez sur ENTRÉE pour démarrer...")
-
-# Compteurs
-succes = 0
-echecs = 0
-ips_utilisees = set()
-debut = datetime.now()
-
-print("\n🚀 Démarrage des clics...\n")
-
-# Boucle principale
-for i in range(1, MAX_CLICS * 3):  # Maximum 3x plus de tentatives
-    if succes >= MAX_CLICS:
-        print(f"\n✅ Objectif atteint: {MAX_CLICS} clics!")
-        break
-    
-    # Obtenir l'IP actuelle
-    ip_actuelle = get_ip()
-    ips_utilisees.add(ip_actuelle)
-    
-    # Afficher le clic
-    print(f"[{succes}/{MAX_CLICS}] Clic #{i} (IP: {ip_actuelle[:15]})...", end=" ")
-    
-    # Faire le clic
-    if faire_clic():
-        succes += 1
-        print(f"✅ Total: {succes}")
-    else:
-        echecs += 1
-        print("❌ Échec")
-    
-    # Si objectif pas atteint, changer d'IP
-    if succes < MAX_CLICS:
-        renew_ip()
-        time.sleep(PAUSE)
-
-# Calcul de la durée
-duree = int((datetime.now() - debut).total_seconds())
-
-# Résultats finaux
-print("\n" + "=" * 60)
-print("📊 RÉSULTATS FINAUX")
-print("=" * 60)
-print(f"✅ Clics réussis     : {succes}")
-print(f"❌ Échecs            : {echecs}")
-print(f"🌐 IPs uniques       : {len(ips_utilisees)}")
-print(f"⏱️  Durée totale      : {duree // 60}m {duree % 60}s")
-print("=" * 60)
-
-if succes >= MAX_CLICS:
-    print("\n🎉 MISSION ACCOMPLIE ! 🎉")
-else:
-    print(f"\n⚠️ Seulement {succes}/{MAX_CLICS} clics réussis")
-
-print(f"\n📋 Liste des IPs utilisées ({len(ips_utilisees)}):")
-for idx, ip in enumerate(sorted(ips_utilisees)[:10], 1):
-    print(f"   {idx}. {ip}")
-if len(ips_utilisees) > 10:
-    print(f"   ... et {len(ips_utilisees) - 10} autres")
-
-print("\n" + "=" * 60)
+# Execution
+print("🔥 Bot de classement lancé sur Kali...")
+success = 0
+with requests.Session() as s:
+    while success < OBJECTIF:
+        if changer_ip():
+            if clic_via_tor(s, success + 1):
+                success += 1
+            # Pause pour être discret (important !)
+            time.sleep(random.uniform(5, 10))
